@@ -22,10 +22,14 @@ curl -s localhost:8000/query \
 
 ## Endpoints
 
-| Method | Path      | Description                       |
-|--------|-----------|-----------------------------------|
-| GET    | `/health` | Liveness check                    |
-| POST   | `/query`  | Execute SQL, returns JSON result  |
+| Method | Path               | Description                                    |
+|--------|--------------------|------------------------------------------------|
+| GET    | `/health`          | Liveness check                                 |
+| POST   | `/query`           | Execute SQL, returns JSON result               |
+| GET    | `/datasets`        | List all registered datasets                   |
+| POST   | `/datasets`        | Register a dataset (auto-infers column schema) |
+| GET    | `/datasets/{name}` | Get dataset detail including columns           |
+| DELETE | `/datasets/{name}` | Unregister a dataset                           |
 
 ### POST /query
 
@@ -55,6 +59,52 @@ curl -s localhost:8000/query \
 
 Without credentials, local parquet queries still work normally.
 
+## Catalog
+
+Duckstack includes an optional PostgreSQL-backed catalog for registering datasets with logical names.
+When configured, the catalog auto-infers column schemas from parquet files on registration.
+
+### Setup
+
+Set the `DATABASE_URL` environment variable to enable the catalog:
+
+```bash
+export DATABASE_URL=postgresql://user:pass@localhost:5432/duckstack
+uvicorn duckstack.main:app --reload
+```
+
+The required tables (`datasets` and `dataset_columns`) are created automatically on startup.
+
+Without `DATABASE_URL`, the catalog endpoints return `503 Service Unavailable`.
+
+### Usage
+
+Register a dataset:
+
+```bash
+curl -X POST localhost:8000/datasets \
+  -H 'Content-Type: application/json' \
+  -d '{"name": "employees", "path": "sample.parquet", "description": "Employee records"}'
+```
+
+List all datasets:
+
+```bash
+curl localhost:8000/datasets
+```
+
+Get dataset detail with column schema:
+
+```bash
+curl localhost:8000/datasets/employees
+```
+
+Delete a dataset:
+
+```bash
+curl -X DELETE localhost:8000/datasets/employees
+```
+
 ## Tests
 
 ```bash
@@ -63,5 +113,4 @@ pytest
 
 ## Roadmap
 
-- PostgreSQL catalog for dataset metadata
 - Auth and query allow-listing
