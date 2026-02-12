@@ -1,6 +1,23 @@
 __pycache__/
-*.pyc
+*.py[cod]
 *.egg-info/
-.venv/
-.pytest_cache/
 dist/
+build/
+
+# Virtual environment
+.venv/
+
+# Testing
+.pytest_cache/
+.coverage
+
+# Environment
+.env
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
