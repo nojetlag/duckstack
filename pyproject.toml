@@ -9,6 +9,7 @@ dependencies = [
     "duckdb>=1.1",
     "pyarrow>=18.0",
     "pydantic>=2.0",
+    "pydantic-settings>=2.0",
 ]
 
 [project.optional-dependencies]

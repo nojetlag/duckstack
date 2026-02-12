@@ -33,3 +33,8 @@ def test_query_aggregate():
 def test_query_invalid_sql():
     resp = client.post("/query", json={"sql": "SELECT * FROM nonexistent_table"})
     assert resp.status_code == 400
+
+
+def test_query_s3_path_returns_error_without_real_bucket():
+    resp = client.post("/query", json={"sql": "SELECT * FROM 's3://no-such-bucket/file.parquet'"})
+    assert resp.status_code == 400
