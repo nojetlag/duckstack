@@ -6,8 +6,14 @@ import duckdb
 from fastapi import FastAPI, HTTPException
 
 from duckstack import catalog
+from duckstack.api_client import fetch_api_data
 from duckstack.config import settings
 from duckstack.schemas import (
+    ApiQueryRequest,
+    ApiQueryResponse,
+    ApiSourceCreate,
+    ApiSourceDetail,
+    ApiSourceSummary,
     DatasetCreate,
     DatasetDetail,
     DatasetSummary,
@@ -119,3 +125,86 @@ async def delete_dataset(name: str):
     deleted = await catalog.delete_dataset(pool, name)
     if not deleted:
         raise HTTPException(status_code=404, detail=f"Dataset '{name}' not found")
+
+
+# --- API Sources ---
+
+
+@app.get("/api-sources", response_model=list[ApiSourceSummary])
+async def list_api_sources():
+    pool = _require_catalog(app)
+    return await catalog.list_api_sources(pool)
+
+
+@app.post("/api-sources", response_model=ApiSourceDetail, status_code=201)
+async def create_api_source(body: ApiSourceCreate):
+    pool = _require_catalog(app)
+    try:
+        source = await catalog.create_api_source(
+            pool,
+            body.name,
+            body.endpoint_url,
+            body.query_params,
+            body.auth_header,
+            body.auth_env_var,
+            body.api_key_param,
+            body.api_key_override,
+            body.response_path,
+            body.ttl_seconds,
+            body.description,
+        )
+    except Exception as e:
+        if "unique" in str(e).lower() or "duplicate" in str(e).lower():
+            raise HTTPException(status_code=409, detail=f"API source '{body.name}' already exists")
+        raise
+    return source
+
+
+@app.get("/api-sources/{name}", response_model=ApiSourceDetail)
+async def get_api_source(name: str):
+    pool = _require_catalog(app)
+    source = await catalog.get_api_source(pool, name)
+    if source is None:
+        raise HTTPException(status_code=404, detail=f"API source '{name}' not found")
+    return source
+
+
+@app.delete("/api-sources/{name}", status_code=204)
+async def delete_api_source(name: str):
+    pool = _require_catalog(app)
+    deleted = await catalog.delete_api_source(pool, name)
+    if not deleted:
+        raise HTTPException(status_code=404, detail=f"API source '{name}' not found")
+
+
+@app.post("/api-query", response_model=ApiQueryResponse)
+async def api_query(req: ApiQueryRequest):
+    pool = _require_catalog(app)
+    source = await catalog.get_api_source(pool, req.source)
+    if source is None:
+        raise HTTPException(status_code=404, detail=f"API source '{req.source}' not found")
+
+    try:
+        columns, rows, was_cached = await fetch_api_data(source, req.params, db)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"API fetch failed: {e}")
+
+    # Optional SQL filtering on fetched data
+    if req.sql:
+        try:
+            import json
+            json_str = json.dumps([dict(zip(columns, row)) for row in rows])
+            db.execute(f"CREATE OR REPLACE TEMP TABLE {req.source} AS SELECT * FROM read_json_auto(?)", [json_str])
+            result = db.execute(req.sql)
+            columns = [desc[0] for desc in result.description]
+            rows = [list(r) for r in result.fetchall()]
+        except duckdb.Error as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
+    return ApiQueryResponse(
+        columns=columns,
+        rows=rows,
+        row_count=len(rows),
+        cached=was_cached,
+        source_name=req.source,
+    )

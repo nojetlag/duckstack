@@ -11,11 +11,11 @@ dependencies = [
     "pydantic>=2.0",
     "pydantic-settings>=2.0",
     "asyncpg>=0.30",
+    "httpx>=0.28",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "httpx>=0.28",
     "pytest>=8.0",
 ]
 
