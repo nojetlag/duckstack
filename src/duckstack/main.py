@@ -1,3 +1,4 @@
+import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -14,13 +15,17 @@ from duckstack.schemas import (
     QueryResponse,
 )
 
-DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data"
+DATA_DIR = Path(settings.data_dir) if settings.data_dir else Path(__file__).resolve().parent.parent.parent / "data"
 
 db = duckdb.connect()
+db.execute(f"SET home_directory = '{os.environ.get('DUCKDB_HOME', '/tmp')}'")
 db.execute(f"SET file_search_path = '{DATA_DIR}'")
 
-# S3 support via httpfs
-db.execute("INSTALL httpfs")
+# S3 support via httpfs (INSTALL is skipped when pre-installed, e.g. in Docker)
+try:
+    db.execute("INSTALL httpfs")
+except duckdb.Error:
+    pass  # already installed (e.g. baked into container image)
 db.execute("LOAD httpfs")
 if settings.aws_access_key_id:
     db.execute(f"SET s3_access_key_id = '{settings.aws_access_key_id}'")

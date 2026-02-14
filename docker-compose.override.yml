@@ -1,0 +1,7 @@
+# Development overrides - automatically loaded by docker compose
+# Mounts local data/ for rapid iteration without rebuilding
+services:
+  app:
+    volumes:
+      - ./data:/app/data:ro
+    read_only: false
